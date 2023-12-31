@@ -1,0 +1,133 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: rhoai-scikit-learn-template
+  title: Machine Learning with Scikit Learn on RHOAI Template 
+  description: Deploy a data science project with a regression exercise on RHOAI
+  tags:
+    - ml
+    - workshop
+    - python    
+spec:
+  owner: rhdeveloper-workshop-authors
+  type: service
+
+  parameters:
+    - title: Provide information about the GitHub location
+      required:
+        - githubOrg
+      properties:
+        githubOrg:
+          title: GitHub Organization
+          type: string
+          default: stefan-bergstein
+        description:
+          title: Description
+          type: string
+          description: Help others understand what this component is for
+          default: RHOAI data science project with a scikit-learn regression exercise 
+    - title: Provide information about the new component
+      required:
+        - cluster_id
+        - namespace
+        - owner
+      properties:
+        cluster_id:
+          title: Cluster Id
+          type: string
+          description: Id of the cluster
+          default: .apps.ocp5.stormshift.coe.muc.redhat.com
+        namespace: 
+          title: Namespace
+          type: string
+          description: Namespace
+          default: my-dsp
+        owner:
+          title: Owner
+          type: string
+          description: Owner of the component
+          default: janus-authors
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: [User]
+  steps:
+    - id: templateSource
+      name: Generating the source code component
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: ./source
+        values:
+          githubOrg: ${{parameters.githubOrg}}
+          repoName: ${{parameters.namespace}}-rhoai-sklearn
+          owner: ${{parameters.owner}}
+          cluster_id: ${{parameters.cluster_id}}
+          namespace: ${{parameters.namespace}}
+          component_id: ${{parameters.namespace}}-rhoai-sklearn-dsp
+    - id: publishSource
+      name: Publishing to Source Code Repository
+      action: publish:github
+      input:
+        sourcePath: ./source
+        allowedHosts:
+          - github.com
+        description: ${{parameters.description}}
+        repoUrl: github.com?owner=${{parameters.githubOrg}}&repo=${{parameters.namespace}}-rhoai-sklearn
+        defaultBranch: main
+        protectDefaultBranch: false
+        repoVisibility: public    
+    - id: registerSource
+      name: Registering the Source Code Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{steps.publishSource.output.repoContentsUrl}}
+        catalogInfoPath: /catalog-info.yaml
+    - id: templateGitops
+      name: Generating the deployment resources and artefacts
+      action: fetch:template
+      input:
+        url: ./manifests
+        copyWithoutTemplating: []
+        values:
+          component_id: ${{parameters.namespace}}-rhoai-sklearn-dsp
+          description: ${{parameters.description}}
+          destination: https://github.com/${{parameters.githubOrg}}/${{parameters.namespace}}-rhoai-sklearn-gitops
+          source_repository: https://github.com/${{parameters.githubOrg}}/${{parameters.namespace}}-rhoai-sklearn
+          repository_name: ${{parameters.namespace}}-rhoai-sklearn
+          git_owner: ${{parameters.githubOrg}}
+          cluster: ${{parameters.cluster_id}}
+          namespace: ${{parameters.namespace}}
+          image_host: ${{parameters.image_host}}
+          image_name: ${{parameters.namespace}}/rhoai-sklearn-dsp
+          image_tag: ${{parameters.image_tag}}
+        targetPath: ./tenant-gitops
+    - id: publishGitops
+      name: Publishing to Deployment Resource Repository
+      action: publish:github
+      input:
+        repoUrl: github.com?owner=${{parameters.githubOrg}}&repo=${{parameters.namespace}}-rhoai-sklearn-gitops
+        title: gitops resources for ${{parameters.namespace}}-rhoai-sklearn-dsp
+        description: gitops resources for ${{parameters.namespace}}-rhoai-sklearn-dsp
+        sourcePath: ./tenant-gitops
+        defaultBranch: main
+        protectDefaultBranch: false
+        repoVisibility: public
+    - id: createArgoResources
+      name: Create ArgoCD Resources
+      action: argocd:create-resources
+      input:
+        appName: ${{parameters.namespace}}-rhoai-sklearn-dsp-bootstrap
+        argoInstance: argo-rhdh
+        namespace: janus-argocd
+        repoUrl: https://github.com/${{parameters.githubOrg}}/${{parameters.namespace}}-rhoai-sklearn-gitops.git
+        path: 'argocd/'
+  output:
+    links:
+      - title: Source Code Repository
+        url: ${{steps.publishSource.output.remoteUrl}}
+      - title: Pipeline status
+        url: https://console-openshift-console${{parameters.cluster_id}}/dev-pipelines/ns/${{parameters.namespace}}/
+      - title: Open Component in catalog
+        icon: catalog
+        entityRef: ${{steps.registerSource.output.entityRef}}

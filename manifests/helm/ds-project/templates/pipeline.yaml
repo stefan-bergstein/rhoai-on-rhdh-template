@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: configure-ds-project
+  labels:
+    type: pipeline
+    backstage.io/kubernetes-id: {{ .Values.app.name }}
+spec:
+  params:
+    - name: source-repo
+      description: source repo that contains the application code
+      type: string
+      default: {{ .Values.git.repo }}
+  tasks:
+    - name: wait-for-workbench
+      params:
+        - name: SCRIPT
+          value: >-
+            oc wait -l statefulset={{ .Values.app.name }}
+            --for=condition=ready pod --timeout=300s
+        - name: VERSION
+          value: latest
+      taskRef:
+        kind: ClusterTask
+        name: openshift-client
+    - name: clone-repo
+      params:
+        - name: SCRIPT
+          value: oc exec  StatefulSet/{{ .Values.app.name }} -- git clone $(params.source-repo)
+        - name: VERSION
+          value: latest
+      runAfter:
+        - wait-for-workbench
+      taskRef:
+        kind: ClusterTask
+        name: openshift-client

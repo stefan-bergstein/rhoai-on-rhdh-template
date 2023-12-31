@@ -1,0 +1,11 @@
+app:
+  name: dsp-test-sbergste
+  namespace: dsp-test
+  cluster: .apps.ocp5.stormshift.coe.muc.redhat.com
+  user: admin
+
+
+git:
+  branch: main
+  repo: https://github.com/stefan-bergstein/ml-sklearn-rhoai-sklearn.git
+

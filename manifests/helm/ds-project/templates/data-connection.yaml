@@ -1,0 +1,19 @@
+kind: Secret
+apiVersion: v1
+metadata:
+  name: aws-connection-{{ .Values.app.name }}
+  namespace: {{ .Values.app.namespace }}
+  labels:
+    opendatahub.io/dashboard: 'true'
+    opendatahub.io/managed: 'true'
+  annotations:
+    opendatahub.io/connection-type: s3
+    openshift.io/display-name: {{ .Values.app.name }}
+    argocd.argoproj.io/sync-wave: "-2" 
+stringData:
+  AWS_ACCESS_KEY_ID: minio
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_S3_BUCKET: {{ .Values.app.name }}
+  AWS_S3_ENDPOINT: http://minio-service.minio.svc.cluster.local:9000
+  AWS_SECRET_ACCESS_KEY: minio123
+type: Opaque
